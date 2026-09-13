@@ -261,6 +261,36 @@ std::vector<OptionHandler*> OptionHandlerFactory::createOptionHandlers()
     op->addTag(TAG_ADVANCED);
     handlers.push_back(op);
   }
+  {
+    OptionHandler* op(new BooleanOptionHandler(PREF_PROGRESS_BAR,
+                                               TEXT_PROGRESS_BAR, A2_V_TRUE,
+                                               OptionHandler::OPT_ARG));
+    op->addTag(TAG_ADVANCED);
+    handlers.push_back(op);
+  }
+  {
+    OptionHandler* op(new ParameterOptionHandler(
+        PREF_PROGRESS_BAR_STYLE, TEXT_PROGRESS_BAR_STYLE, "auto",
+        {"auto", "blocks", "shade", "line", "dots", "square", "slant", "arrow",
+         "hash"}));
+    op->addTag(TAG_ADVANCED);
+    handlers.push_back(op);
+  }
+  {
+    OptionHandler* op(new ParameterOptionHandler(
+        PREF_PROGRESS_BAR_COLOR, TEXT_PROGRESS_BAR_COLOR, "green",
+        {"none", "black", "red", "green", "yellow", "blue", "magenta", "cyan",
+         "white", "lightred", "lightgreen", "lightyellow", "lightblue",
+         "lightmagenta", "lightcyan", "lightwhite"}));
+    op->addTag(TAG_ADVANCED);
+    handlers.push_back(op);
+  }
+  {
+    OptionHandler* op(new NumberOptionHandler(
+        PREF_PROGRESS_BAR_WIDTH, TEXT_PROGRESS_BAR_WIDTH, "0", 0, 200));
+    op->addTag(TAG_ADVANCED);
+    handlers.push_back(op);
+  }
 #if defined(HAVE_MMAP) || defined(__MINGW32__)
   {
     OptionHandler* op(new BooleanOptionHandler(PREF_ENABLE_MMAP,

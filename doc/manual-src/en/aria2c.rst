@@ -1336,6 +1336,57 @@ Advanced Options
   Enable color output for a terminal.
   Default: ``true``
 
+.. option:: --progress-bar [true|false]
+
+  Draw a progress bar in the console readout. With one download it shows
+  how much of that file has arrived. With several downloads queued it also
+  shows how many of them are finished, as a ``[FILES ...]`` block at the
+  start of the line. Both show the time elapsed so far next to the ETA. The
+  bar is only drawn on a terminal; redirected output is unaffected.
+
+  Default: ``true``
+
+.. option:: --progress-bar-style=<STYLE>
+
+  Character set the progress bar is drawn with. ``auto`` picks ``slant``
+  on a terminal that can show it and ``hash`` everywhere else.
+
+  ``blocks``
+    Solid blocks, advancing in eighths of a column, against light shade.
+  ``shade``
+    Medium shade against light shade.
+  ``line``
+    A heavy horizontal rule against a light one.
+  ``dots``
+    Filled circles against hollow ones.
+  ``square``
+    Filled squares against hollow ones.
+  ``slant``
+    Filled parallelograms against hollow ones.
+  ``arrow``
+    ``=`` with a ``>`` head, as :program:`wget` draws it. Plain ASCII.
+  ``hash``
+    ``#`` against ``-``. Plain ASCII.
+
+  Default: ``auto``
+
+.. option:: --progress-bar-color=<COLOR>
+
+  Colour of the filled part of the progress bar. One of ``none``,
+  ``black``, ``red``, ``green``, ``yellow``, ``blue``, ``magenta``,
+  ``cyan``, ``white``, or those last seven prefixed with ``light``.
+  ``none`` leaves the bar uncoloured. Ignored when
+  :option:`--enable-color` is ``false``.
+
+  Default: ``green``
+
+.. option:: --progress-bar-width=<WIDTH>
+
+  Width of the progress bar in columns. ``0`` takes a fifth of the
+  terminal width, held between 8 and 25 columns.
+
+  Default: ``0``
+
 .. option:: --enable-mmap [true|false]
 
    Map files into memory. This option may not work if the file space

@@ -357,6 +357,10 @@ PrefPtr PREF_GID = makePref("gid");
 // values: 1*digit
 PrefPtr PREF_SAVE_SESSION_INTERVAL = makePref("save-session-interval");
 PrefPtr PREF_ENABLE_COLOR = makePref("enable-color");
+PrefPtr PREF_PROGRESS_BAR = makePref("progress-bar");
+PrefPtr PREF_PROGRESS_BAR_STYLE = makePref("progress-bar-style");
+PrefPtr PREF_PROGRESS_BAR_COLOR = makePref("progress-bar-color");
+PrefPtr PREF_PROGRESS_BAR_WIDTH = makePref("progress-bar-width");
 // value: string
 PrefPtr PREF_RPC_SECRET = makePref("rpc-secret");
 // values: 1*digit

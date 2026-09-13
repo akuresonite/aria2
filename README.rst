@@ -75,6 +75,7 @@ Here is a list of features:
 * Parameterized URI support
 * IPv6 support with Happy Eyeballs
 * Disk cache to reduce disk activity
+* Console progress bar with eight styles, colours and a queue counter
 
 
 Versioning and release schedule
@@ -398,6 +399,100 @@ man page by ``make html``. The HTML version manual is also available
 `online <https://aria2.github.io/manual/en/html/>`_ (`Russian
 translation <https://aria2.github.io/manual/ru/html/>`_, `Portuguese
 translation <https://aria2.github.io/manual/pt/html/>`_).
+
+Console progress bar
+--------------------
+
+When aria2 runs on a terminal it draws a progress bar in the readout line.
+With one download the bar shows how much of that file has arrived::
+
+    [#29dc39 ▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱ 16MiB/40MiB(40%) CN:8 DL:3.2MiB ELAPSED:5s ETA:7s]
+
+With several downloads queued (for example ``-i list.txt``) a ``[FILES ...]``
+block leads the line. It counts finished files, shows the time spent so far
+and an estimate for the rest of the queue::
+
+    [FILES ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱ 12/40(30%) ELAPSED:1m3s ETA:2m32s][DL:1.0MiB][#7db3cb 0B/488KiB(0%)]
+
+The same figures are added to the download progress summary that
+``--summary-interval`` prints.
+
+Four options control the bar:
+
+``--progress-bar[=true|false]``
+    Turn the bar on or off. Off gives exactly the readout of earlier
+    versions. Default: ``true``.
+``--progress-bar-style=STYLE``
+    One of ``auto``, ``slant``, ``blocks``, ``shade``, ``line``, ``dots``,
+    ``square``, ``arrow``, ``hash``. ``auto`` draws ``slant`` on a terminal
+    that can show it and falls back to ``hash`` (plain ``#`` and ``-``)
+    everywhere else, so the bar never turns into garbage. ``blocks`` moves
+    in eighths of a column. ``arrow`` and ``hash`` are plain ASCII.
+    Default: ``auto``.
+``--progress-bar-color=COLOR``
+    ``none``, ``black``, ``red``, ``green``, ``yellow``, ``blue``,
+    ``magenta``, ``cyan``, ``white``, or the last seven prefixed with
+    ``light``. Ignored when ``--enable-color=false``. Default: ``green``.
+``--progress-bar-width=N``
+    Width in columns. ``0`` takes a fifth of the terminal width, kept
+    between 8 and 25 columns. Default: ``0``.
+
+Examples::
+
+    aria2c https://example.org/file.iso
+    aria2c --progress-bar-style=blocks --progress-bar-color=cyan https://example.org/file.iso
+    aria2c -i list.txt --max-concurrent-downloads=3
+    aria2c --progress-bar=false https://example.org/file.iso
+
+The bar is only drawn when standard output is a terminal. Output sent to a
+file or a pipe is plain text, one readout line per second, on every
+platform including Windows.
+
+All settings can also go in ``aria2.conf``, for example
+``progress-bar-style=dots``.
+
+Test builds, build scripts and security scan
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ready-made binaries of this branch, scripts to build it yourself, and the
+security scan of the change are on the releases page of this fork:
+
+https://github.com/akuresonite/aria2/releases/tag/progress-bar-test.1
+
+Build it with one command (clones this branch into ``./aria2`` and builds it;
+the Windows one needs Docker, the macOS one needs Homebrew)::
+
+    git clone -b feature/console-progress-bar https://github.com/akuresonite/aria2.git && bash aria2/contrib/console-progress-bar/build-linux.sh
+    git clone -b feature/console-progress-bar https://github.com/akuresonite/aria2.git && bash aria2/contrib/console-progress-bar/build-macos.sh
+    git clone -b feature/console-progress-bar https://github.com/akuresonite/aria2.git && bash aria2/contrib/console-progress-bar/build-windows.sh
+
+Each script ends by printing the path of the new binary and how to use it.
+Add ``--install`` to also put it on your PATH as plain ``aria2c``
+(``/usr/local/bin/aria2c`` on Linux and macOS, the user WindowsApps folder on
+Windows). Without ``--install``, run the printed path directly, or copy the
+file wherever you like. Settings go in ``~/.aria2/aria2.conf`` on Linux and
+macOS and ``%USERPROFILE%\.aria2\aria2.conf`` on Windows.
+
+What is on the releases page:
+
+* ``aria2c-windows-x86_64.exe`` - Windows 10/11 64-bit, built with the same
+  mingw-w64 recipe as the official aria2 release.
+* ``aria2c-linux-x86_64`` and ``aria2c-linux-aarch64`` - fully static, so
+  they run on any Linux of that CPU type. OpenSSL is compiled in and system
+  certificates are read from ``/etc/ssl``.
+* macOS - no binary; run ``build-macos.sh`` on a Mac with Homebrew, about
+  two minutes.
+* ``build-windows.sh``, ``build-linux.sh``, ``build-macos.sh`` - each script
+  finds the source next to it or clones this branch, installs what it
+  needs, builds, and prints the path of the result. ``build-linux.sh
+  --static`` and ``build-windows.sh`` use Docker; the rest build natively.
+* ``vapt-report.md`` - the security scan of the change: Semgrep, Gitleaks and
+  OSV-Scanner plus a manual review of every new input. Result: PASS, no
+  findings.
+* ``SHA256SUMS.txt`` - to verify the downloads.
+
+These are test builds, not aria2 releases, and the binaries are unsigned.
+The three build scripts and the scan report are also in the source tree,
+under ``contrib/console-progress-bar/``.
 
 BitTorrent
 -----------

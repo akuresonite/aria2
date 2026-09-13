@@ -62,6 +62,7 @@ aria2c_SOURCES = AllTest.cc\
 	SequentialPickerTest.cc\
 	RarestPieceSelectorTest.cc\
 	PieceStatManTest.cc\
+	ProgressBarTest.cc\
 	InorderPieceSelector.h\
 	LongestSequencePieceSelectorTest.cc\
 	a2algoTest.cc\

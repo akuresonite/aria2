@@ -196,6 +196,7 @@ SRCS =  \
 	PreDownloadHandler.h\
 	prefs.cc prefs.h\
 	ProgressAwareEntry.h\
+	ProgressBar.cc ProgressBar.h\
 	ProtocolDetector.cc ProtocolDetector.h\
 	Randomizer.h\
 	Range.cc Range.h\

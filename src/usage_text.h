@@ -1023,6 +1023,21 @@
     "                              when aria2 exits.")
 #define TEXT_ENABLE_COLOR                                               \
   _(" --enable-color[=true|false]  Enable color output for a terminal.")
+#define TEXT_PROGRESS_BAR                                                \
+  _(" --progress-bar[=true|false] Draw a progress bar in the console readout.\n"\
+    "                              It shows the file being downloaded, or the\n"\
+    "                              whole batch when several downloads are queued.")
+#define TEXT_PROGRESS_BAR_STYLE                                          \
+  _(" --progress-bar-style=STYLE  Character set the progress bar is drawn with.\n"\
+    "                              auto picks slant on a terminal that can show\n"\
+    "                              it, and hash everywhere else.")
+#define TEXT_PROGRESS_BAR_COLOR                                          \
+  _(" --progress-bar-color=COLOR  Colour of the filled part of the bar.\n"\
+    "                              none leaves it uncoloured. Ignored when\n"\
+    "                              --enable-color=false.")
+#define TEXT_PROGRESS_BAR_WIDTH                                          \
+  _(" --progress-bar-width=WIDTH  Width of the progress bar in columns.\n"\
+    "                              0 sizes it from the terminal width.")
 #define TEXT_RPC_SECRET                                                 \
   _(" --rpc-secret=TOKEN           Set RPC secret authorization token.")
 #define TEXT_DSCP                                                       \

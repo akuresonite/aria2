@@ -73,6 +73,38 @@ std::string ColorizedStreamBuf::str(bool color) const
   return rv.str();
 }
 
+namespace {
+// Number of terminal columns |s| occupies. The trailing bytes of a UTF-8
+// sequence are 10xxxxxx and do not move the cursor, so they are not counted.
+size_t columnWidth(const std::string& s)
+{
+  size_t cols = 0;
+  for (auto c : s) {
+    if ((static_cast<unsigned char>(c) & 0xc0) != 0x80) {
+      ++cols;
+    }
+  }
+  return cols;
+}
+
+// Length in bytes of the longest prefix of |s| that fits in |cols| columns.
+// Cutting here never splits a UTF-8 sequence in half.
+size_t prefixBytesForColumns(const std::string& s, size_t cols)
+{
+  size_t seen = 0;
+  size_t i = 0;
+  for (; i < s.size(); ++i) {
+    if ((static_cast<unsigned char>(s[i]) & 0xc0) != 0x80) {
+      if (seen == cols) {
+        break;
+      }
+      ++seen;
+    }
+  }
+  return i;
+}
+} // namespace
+
 std::string ColorizedStreamBuf::str(bool color, size_t max) const
 {
   std::stringstream rv;
@@ -83,9 +115,9 @@ std::string ColorizedStreamBuf::str(bool color, size_t max) const
       }
       continue;
     }
-    auto size = e.second.size();
+    auto size = columnWidth(e.second);
     if (size > max) {
-      rv.write(e.second.c_str(), max);
+      rv.write(e.second.c_str(), prefixBytesForColumns(e.second, max));
       break;
     }
     rv << e.second;

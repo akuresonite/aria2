@@ -37,10 +37,12 @@
 
 #include "StatCalc.h"
 
+#include <ctime>
 #include <string>
 #include <functional>
 #include <memory>
 
+#include "ProgressBar.h"
 #include "TimerA2.h"
 
 namespace aria2 {
@@ -55,11 +57,31 @@ public:
   std::string operator()(int64_t size) const;
 };
 
+// How far a whole batch of downloads has got. |total| counts every
+// download the session knows about, finished ones included.
+struct OverallProgress {
+  size_t done = 0;
+  size_t active = 0;
+  size_t waiting = 0;
+  size_t total = 0;
+  int error = 0;
+};
+
+// Seconds the rest of the batch is expected to need, extrapolated from
+// the |elapsed| seconds the finished downloads took. Returns 0 while
+// nothing has finished, because there is then nothing to extrapolate
+// from, and 0 once everything is done.
+time_t overallEta(const OverallProgress& p, time_t elapsed);
+
 class ConsoleStatCalc : public StatCalc {
 private:
   Timer cp_;
 
   Timer lastSummaryNotified_;
+
+  // When this object was made, which is close enough to when the
+  // session started. The batch ETA is measured from here.
+  Timer startTime_;
 
   std::chrono::seconds summaryInterval_;
 
@@ -68,6 +90,10 @@ private:
   bool truncate_;
   bool isTTY_;
   bool colorOutput_;
+  bool barEnabled_;
+  ProgressBarStyle barStyle_;
+  const colors::Color* barColor_;
+  size_t barWidth_;
 
 public:
   ConsoleStatCalc(std::chrono::seconds summaryInterval, bool colorOutput = true,
@@ -83,6 +109,19 @@ public:
   }
 
   void setTruncate(bool truncate) { truncate_ = truncate; }
+
+  // Configures the progress bar drawn in the readout. A |width| of 0 asks
+  // for a width derived from the terminal. |style| may still be AUTO; it
+  // is resolved once, here, because the terminal encoding cannot change
+  // while aria2 runs.
+  void setProgressBar(bool enabled, ProgressBarStyle style,
+                      const colors::Color& color, size_t width)
+  {
+    barEnabled_ = enabled;
+    barStyle_ = resolveProgressBarStyle(style);
+    barColor_ = &color;
+    barWidth_ = width;
+  }
 };
 
 } // namespace aria2

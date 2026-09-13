@@ -167,8 +167,30 @@ void printProgressCompact(ColorizedStream& o, const DownloadEngine* e,
 } // namespace
 
 namespace {
+// What the readout needs in order to draw a bar. A width of 0 means no bar.
+struct BarConfig {
+  size_t width = 0;
+  ProgressBarStyle style = ProgressBarStyle::HASH;
+  const colors::Color* color = &colors::clear;
+};
+
+// A fifth of the line, held between sane bounds, leaves room for the
+// numbers that follow the bar even at the 79 column default. A configured
+// width wins, but never grows past the line itself.
+size_t barWidthFor(size_t cols, size_t configured)
+{
+  if (configured > 0) {
+    return std::min(configured, cols);
+  }
+  return std::min(static_cast<size_t>(25),
+                  std::max(static_cast<size_t>(8), cols / 5));
+}
+} // namespace
+
+namespace {
 void printProgress(ColorizedStream& o, const std::shared_ptr<RequestGroup>& rg,
-                   const DownloadEngine* e, const SizeFormatter& sizeFormatter)
+                   const DownloadEngine* e, const SizeFormatter& sizeFormatter,
+                   const BarConfig& bar)
 {
   TransferStat stat = rg->calculateStat();
   int eta = 0;
@@ -178,6 +200,13 @@ void printProgress(ColorizedStream& o, const std::shared_ptr<RequestGroup>& rg,
   }
   o << colors::magenta << "[" << colors::clear << "#"
     << GroupId::toAbbrevHex(rg->getGID()) << " ";
+  if (bar.width > 0 && rg->getTotalLength() > 0) {
+    o << *bar.color
+      << progressBar(static_cast<double>(rg->getCompletedLength()) /
+                         static_cast<double>(rg->getTotalLength()),
+                     bar.width, bar.style)
+      << colors::clear << " ";
+  }
   printSizeProgress(o, rg, stat, sizeFormatter);
   o << " CN:" << rg->getNumConnection();
 #ifdef ENABLE_BITTORRENT
@@ -197,6 +226,17 @@ void printProgress(ColorizedStream& o, const std::shared_ptr<RequestGroup>& rg,
       << colors::clear;
     o << "(" << sizeFormatter(stat.allTimeUploadLength) << "B)";
   }
+  if (bar.width > 0) {
+    // The start time is zero until the group is actually started.
+    const Timer& start =
+        rg->getDownloadContext()->getNetStat().getDownloadStartTime();
+    if (!start.isZero()) {
+      const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                               start.difference(global::wallclock()))
+                               .count();
+      o << " ELAPSED:" << util::secfmt(elapsed);
+    }
+  }
   if (eta > 0) {
     o << " ETA:" << colors::yellow << util::secfmt(eta) << colors::clear;
   }
@@ -210,11 +250,12 @@ private:
   size_t cols_;
   const DownloadEngine* e_;
   const SizeFormatter& sizeFormatter_;
+  const BarConfig& bar_;
 
 public:
   PrintSummary(size_t cols, const DownloadEngine* e,
-               const SizeFormatter& sizeFormatter)
-      : cols_(cols), e_(e), sizeFormatter_(sizeFormatter)
+               const SizeFormatter& sizeFormatter, const BarConfig& bar)
+      : cols_(cols), e_(e), sizeFormatter_(sizeFormatter), bar_(bar)
   {
   }
 
@@ -222,7 +263,7 @@ public:
   {
     const char SEP_CHAR = '-';
     ColorizedStream o;
-    printProgress(o, rg, e_, sizeFormatter_);
+    printProgress(o, rg, e_, sizeFormatter_, bar_);
     const std::vector<std::shared_ptr<FileEntry>>& fileEntries =
         rg->getDownloadContext()->getFileEntries();
     o << "\nFILE: ";
@@ -238,7 +279,9 @@ public:
 namespace {
 void printProgressSummary(const RequestGroupList& groups, size_t cols,
                           const DownloadEngine* e,
-                          const SizeFormatter& sizeFormatter)
+                          const SizeFormatter& sizeFormatter,
+                          const BarConfig& bar, const OverallProgress& op,
+                          time_t elapsed)
 {
   const char SEP_CHAR = '=';
   time_t now;
@@ -262,10 +305,41 @@ void printProgressSummary(const RequestGroupList& groups, size_t cols,
   o << " *** \n"
     << std::setfill(SEP_CHAR) << std::setw(cols) << SEP_CHAR << "\n";
   global::cout()->write(o.str().c_str());
+  if (op.total > 1) {
+    std::stringstream f;
+    f << " Files: " << op.done << "/" << op.total << " done ("
+      << 100 * op.done / op.total << "%)  Active: " << op.active
+      << "  Waiting: " << op.waiting;
+    if (op.error > 0) {
+      f << "  Error: " << op.error;
+    }
+    if (elapsed > 0) {
+      f << "  Elapsed: " << util::secfmt(elapsed);
+    }
+    const time_t eta = overallEta(op, elapsed);
+    if (eta > 0) {
+      f << "  ETA: " << util::secfmt(eta);
+    }
+    f << "\n";
+    global::cout()->write(f.str().c_str());
+  }
   std::for_each(groups.begin(), groups.end(),
-                PrintSummary(cols, e, sizeFormatter));
+                PrintSummary(cols, e, sizeFormatter, bar));
 }
 } // namespace
+
+#ifdef __MINGW32__
+namespace {
+// True only for a handle that really is a console. GetConsoleMode fails on
+// a pipe or a file, which is the same test aria2 already uses to decide
+// whether colour is supported.
+bool winIsConsole()
+{
+  DWORD mode;
+  return ::GetConsoleMode(::GetStdHandle(STD_OUTPUT_HANDLE), &mode) != 0;
+}
+} // namespace
+#endif // __MINGW32__
 
 ConsoleStatCalc::ConsoleStatCalc(std::chrono::seconds summaryInterval,
                                  bool colorOutput, bool humanReadable)
@@ -273,11 +347,19 @@ ConsoleStatCalc::ConsoleStatCalc(std::chrono::seconds summaryInterval,
       readoutVisibility_(true),
       truncate_(true),
 #ifdef __MINGW32__
-      isTTY_(true),
+      // isatty() reports true for a pipe on Windows, so ask the console
+      // API instead. Treating a redirected stream as a terminal fills the
+      // log with carriage returns and pad spaces, and would now put bar
+      // characters in there too.
+      isTTY_(winIsConsole()),
 #else  // !__MINGW32__
       isTTY_(isatty(STDOUT_FILENO) == 1),
 #endif // !__MINGW32__
-      colorOutput_(colorOutput)
+      colorOutput_(colorOutput),
+      barEnabled_(true),
+      barStyle_(resolveProgressBarStyle(ProgressBarStyle::AUTO)),
+      barColor_(&colors::green),
+      barWidth_(0)
 {
   if (humanReadable) {
     sizeFormatter_ = make_unique<AbbrevSizeFormatter>();
@@ -285,6 +367,58 @@ ConsoleStatCalc::ConsoleStatCalc(std::chrono::seconds summaryInterval,
   else {
     sizeFormatter_ = make_unique<PlainSizeFormatter>();
   }
+}
+
+namespace {
+// Every download the session knows about, split by what it is doing now.
+// getNumStoppedTotal() is used rather than counting download results,
+// because results are evicted once max-download-result is reached while
+// this counter is not.
+OverallProgress calcOverallProgress(const RequestGroupMan& rgman)
+{
+  OverallProgress p;
+  p.done = rgman.getNumStoppedTotal();
+  p.active = rgman.countRequestGroup();
+  p.waiting = rgman.getReservedGroups().size();
+  p.total = p.done + p.active + p.waiting;
+  p.error = rgman.getDownloadStat().getError();
+  return p;
+}
+
+// The [FILES ...] block that leads the readout when a batch is running.
+void printOverall(ColorizedStream& o, const OverallProgress& p, time_t elapsed,
+                  const BarConfig& bar)
+{
+  o << colors::magenta << "[" << colors::clear << "FILES";
+  if (bar.width > 0) {
+    o << " " << *bar.color
+      << progressBar(static_cast<double>(p.done) / static_cast<double>(p.total),
+                     bar.width, bar.style)
+      << colors::clear;
+  }
+  o << " " << p.done << "/" << p.total << "(" << 100 * p.done / p.total << "%)";
+  if (p.error > 0) {
+    o << " " << colors::red << "ERR:" << util::itos(p.error) << colors::clear;
+  }
+  if (elapsed > 0) {
+    o << " ELAPSED:" << util::secfmt(elapsed);
+  }
+  const time_t eta = overallEta(p, elapsed);
+  if (eta > 0) {
+    o << " ETA:" << colors::yellow << util::secfmt(eta) << colors::clear;
+  }
+  o << colors::magenta << "]" << colors::clear;
+}
+} // namespace
+
+time_t overallEta(const OverallProgress& p, time_t elapsed)
+{
+  if (p.done == 0 || p.done >= p.total || elapsed <= 0) {
+    return 0;
+  }
+  return static_cast<time_t>(static_cast<double>(elapsed) *
+                             static_cast<double>(p.total - p.done) /
+                             static_cast<double>(p.done));
 }
 
 void ConsoleStatCalc::calculateStat(const DownloadEngine* e)
@@ -304,20 +438,38 @@ void ConsoleStatCalc::calculateStat(const DownloadEngine* e)
 #ifndef __MINGW32__
 #  ifdef HAVE_TERMIOS_H
     struct winsize size;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) == 0) {
-      cols = std::max(0, (int)size.ws_col - 1);
+    // A terminal that reports no width at all, which some pseudo terminals
+    // do, would otherwise truncate the whole readout away. Keep the default
+    // width in that case rather than printing nothing.
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_col > 1) {
+      cols = size.ws_col - 1;
     }
 #  endif // HAVE_TERMIOS_H
 #else    // __MINGW32__
     CONSOLE_SCREEN_BUFFER_INFO info;
+    // As above: a console that reports no usable width keeps the default.
     if (::GetConsoleScreenBufferInfo(::GetStdHandle(STD_OUTPUT_HANDLE),
-                                     &info)) {
-      cols = std::max(0, info.dwSize.X - 2);
+                                     &info) &&
+        info.dwSize.X > 2) {
+      cols = info.dwSize.X - 2;
     }
 #endif   // !__MINGW32__
     std::string line(cols, ' ');
     global::cout()->printf("\r%s\r", line.c_str());
   }
+
+  BarConfig bar;
+  if (barEnabled_ && isTTY_) {
+    bar.width = barWidthFor(cols, barWidth_);
+    bar.style = barStyle_;
+    bar.color = barColor_;
+  }
+  const auto& rgman = *e->getRequestGroupMan();
+  const OverallProgress op = calcOverallProgress(rgman);
+  const time_t elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                             startTime_.difference(global::wallclock()))
+                             .count();
+
   ColorizedStream o;
   if (e->getRequestGroupMan()->countRequestGroup() > 0) {
     if ((summaryInterval_ > 0_s) &&
@@ -325,8 +477,8 @@ void ConsoleStatCalc::calculateStat(const DownloadEngine* e)
                 A2_DELTA_MILLIS >=
             summaryInterval_) {
       lastSummaryNotified_ = global::wallclock();
-      printProgressSummary(e->getRequestGroupMan()->getRequestGroups(), cols, e,
-                           sizeFormatter);
+      printProgressSummary(rgman.getRequestGroups(), cols, e, sizeFormatter,
+                           bar, op, elapsed);
       global::cout()->write("\n");
       global::cout()->flush();
     }
@@ -334,12 +486,17 @@ void ConsoleStatCalc::calculateStat(const DownloadEngine* e)
   if (!readoutVisibility_) {
     return;
   }
-  size_t numGroup = e->getRequestGroupMan()->countRequestGroup();
+  size_t numGroup = rgman.countRequestGroup();
   const bool color = global::cout()->supportsColor() && isTTY_ && colorOutput_;
+  // With a batch queued, how far the batch has got matters more than which
+  // individual files happen to be moving, so it leads the line. Truncation
+  // eats the right hand end, never this.
+  if (op.total > 1) {
+    printOverall(o, op, elapsed, bar);
+  }
   if (numGroup == 1) {
-    const std::shared_ptr<RequestGroup>& rg =
-        *e->getRequestGroupMan()->getRequestGroups().begin();
-    printProgress(o, rg, e, sizeFormatter);
+    const std::shared_ptr<RequestGroup>& rg = *rgman.getRequestGroups().begin();
+    printProgress(o, rg, e, sizeFormatter, bar);
   }
   else if (numGroup > 1) {
     // For more than 2 RequestGroups, use compact readout form

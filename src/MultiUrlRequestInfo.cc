@@ -140,6 +140,13 @@ std::unique_ptr<StatCalc> getStatCalc(const std::shared_ptr<Option>& op)
       op->getAsBool(PREF_ENABLE_COLOR), op->getAsBool(PREF_HUMAN_READABLE));
   impl->setReadoutVisibility(op->getAsBool(PREF_SHOW_CONSOLE_READOUT));
   impl->setTruncate(op->getAsBool(PREF_TRUNCATE_CONSOLE_READOUT));
+  impl->setProgressBar(
+      op->getAsBool(PREF_PROGRESS_BAR),
+      toProgressBarStyle(op->get(PREF_PROGRESS_BAR_STYLE)),
+      op->getAsBool(PREF_ENABLE_COLOR)
+          ? progressBarColor(op->get(PREF_PROGRESS_BAR_COLOR))
+          : colors::clear,
+      static_cast<size_t>(op->getAsInt(PREF_PROGRESS_BAR_WIDTH)));
   return std::move(impl);
 }
 

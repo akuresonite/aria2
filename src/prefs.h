@@ -311,6 +311,14 @@ extern PrefPtr PREF_GID;
 extern PrefPtr PREF_SAVE_SESSION_INTERVAL;
 // value: true |false
 extern PrefPtr PREF_ENABLE_COLOR;
+// Draw a progress bar in the console readout
+extern PrefPtr PREF_PROGRESS_BAR;
+// Character set the progress bar is drawn with
+extern PrefPtr PREF_PROGRESS_BAR_STYLE;
+// Colour of the filled part of the progress bar
+extern PrefPtr PREF_PROGRESS_BAR_COLOR;
+// Width of the progress bar in columns, 0 to size it automatically
+extern PrefPtr PREF_PROGRESS_BAR_WIDTH;
 // value: string
 extern PrefPtr PREF_RPC_SECRET;
 // values: 1*digit

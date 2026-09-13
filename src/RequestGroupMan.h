@@ -245,6 +245,8 @@ public:
     }
 
     int getInProgress() const { return inProgress_; }
+
+    int getError() const { return error_; }
   };
 
   DownloadStat getDownloadStat() const;
